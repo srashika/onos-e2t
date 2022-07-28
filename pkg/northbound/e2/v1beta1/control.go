@@ -7,6 +7,7 @@ package v1beta1
 import (
 	"context"
 	"sync/atomic"
+	"time"
 
 	v2 "github.com/onosproject/onos-e2t/api/e2ap/v2"
 	e2ap_commondatatypes "github.com/onosproject/onos-e2t/api/e2ap/v2/e2ap-commondatatypes"
@@ -82,7 +83,7 @@ type ControlServer struct {
 
 func (s *ControlServer) Control(ctx context.Context, request *e2api.ControlRequest) (*e2api.ControlResponse, error) {
 	log.Infof("Received E2 Control Request %v", request)
-
+	tic1 := time.Now()
 	log.Debugf("Fetching mastership state for E2Node '%s'", request.Headers.E2NodeID)
 	e2NodeEntity, err := s.topo.Get(ctx, topoapi.ID(request.Headers.E2NodeID))
 	if err != nil {
@@ -159,8 +160,16 @@ func (s *ControlServer) Control(ctx context.Context, request *e2api.ControlReque
 		return nil, errors.Status(err).Err()
 	}
 	controlRequest.SetRicControlAckRequest(rcar)
-
+	toc1 := time.Now()
+	preprocessing_time := toc1.Sub(tic1)
+	log.Info("Sending control request to RANSIM ---------------------")
+    	tic2 := time.Now()
 	ack, failure, err := conn.RICControl(ctx, controlRequest)
+	toc2 := time.Now()
+	response_time := toc2.Sub(tic2)
+	log.Info("Received control request from RANSIM ---------------------")
+
+	tic3 := time.Now()
 	if err != nil {
 		log.Warn(err)
 		return nil, errors.Status(err).Err()
@@ -202,6 +211,14 @@ func (s *ControlServer) Control(ctx context.Context, request *e2api.ControlReque
 		}
 		return nil, st.Err()
 	}
+	toc3 := time.Now()
+	postprocessing_time := toc3.Sub(tic3)
+	log.Info("Sending ACK to CMxapp ---------------------")
+	log.Info("=====================================================================")
+	log.Infof("Pre processing time %v", preprocessing_time)
+	log.Infof("response time %v", response_time)
+	log.Infof("Post processing time %v", postprocessing_time)
+	log.Info("=====================================================================")
 	return response, nil
 }
 
